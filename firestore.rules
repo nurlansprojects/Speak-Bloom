@@ -1,0 +1,152 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isCurrentUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'dev.nurlan@gmail.com') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isTeacher() {
+      return isSignedIn() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher')
+      );
+    }
+
+    // 1. Users collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && (isCurrentUser(userId) || isTeacher() || isAdmin());
+      allow list: if isSignedIn() && (isTeacher() || isAdmin());
+      
+      allow create: if isSignedIn() && isCurrentUser(userId) && isValidId(userId)
+        && incoming().uid == request.auth.uid
+        && incoming().email is string && incoming().email.size() <= 256
+        && incoming().role in ['student', 'teacher', 'admin']
+        && (incoming().role == 'student' || isAdmin());
+
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (isCurrentUser(userId) && 
+         incoming().uid == existing().uid &&
+         (!incoming().diff(existing()).affectedKeys().hasAny(['role'])))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 2. Courses collection
+    match /courses/{courseId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (isTeacher() || isAdmin()) && isValidId(courseId)
+        && incoming().teacherId == request.auth.uid
+        && incoming().title is string && incoming().title.size() <= 120;
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (isTeacher() && existing().teacherId == request.auth.uid && incoming().teacherId == existing().teacherId)
+      );
+      allow delete: if isSignedIn() && (isAdmin() || (isTeacher() && existing().teacherId == request.auth.uid));
+    }
+
+    // 3. Activities collection
+    match /activities/{activityId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (isTeacher() || isAdmin()) && isValidId(activityId)
+        && incoming().createdBy == request.auth.uid
+        && incoming().title is string && incoming().title.size() <= 140
+        && incoming().promptText is string && incoming().promptText.size() <= 2500;
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (isTeacher() && existing().createdBy == request.auth.uid && incoming().createdBy == existing().createdBy)
+      );
+      allow delete: if isSignedIn() && (isAdmin() || (isTeacher() && existing().createdBy == request.auth.uid));
+    }
+
+    // 4. Assignments collection
+    match /assignments/{assignmentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (isTeacher() || isAdmin()) && isValidId(assignmentId)
+        && incoming().teacherId == request.auth.uid
+        && incoming().title is string && incoming().title.size() <= 140
+        && incoming().prompt is string && incoming().prompt.size() <= 2500;
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (isTeacher() && existing().teacherId == request.auth.uid && incoming().teacherId == existing().teacherId)
+      );
+      allow delete: if isSignedIn() && (isAdmin() || (isTeacher() && existing().teacherId == request.auth.uid));
+    }
+
+    // 5. Submissions collection
+    match /submissions/{submissionId} {
+      allow get: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid ||
+        resource.data.teacherId == request.auth.uid ||
+        isAdmin()
+      );
+      allow list: if isSignedIn() && (
+        // Enforce secure query boundaries
+        resource.data.studentId == request.auth.uid ||
+        resource.data.teacherId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && isValidId(submissionId)
+        && incoming().studentId == request.auth.uid
+        && incoming().teacherId is string
+        && incoming().status in ['submitted', 'processing'];
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        // Teacher grading
+        (existing().teacherId == request.auth.uid &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'teacherGrade', 'teacherFeedback', 'gradedAt', 'teacherRubricScores'])) ||
+        // Student resubmission
+        (existing().studentId == request.auth.uid && existing().status == 'needs_revision' &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['audioUrl', 'durationSeconds', 'status', 'submittedAt', 'transcript', 'aiAssessment']))
+      );
+      allow delete: if isSignedIn() && (isAdmin() || existing().teacherId == request.auth.uid);
+    }
+
+    // 6. Practice Sessions collection
+    match /practice_sessions/{sessionId} {
+      allow get: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(sessionId)
+        && incoming().studentId == request.auth.uid
+        && incoming().durationSeconds is number;
+      allow update: if isSignedIn() && (isAdmin() || (existing().studentId == request.auth.uid && incoming().studentId == existing().studentId));
+      allow delete: if isSignedIn() && (isAdmin() || existing().studentId == request.auth.uid);
+    }
+
+    // 7. Admins collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow write: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,138 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account information, role, and learning preferences",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "role": { "type": "string", "enum": ["student", "teacher", "admin"] },
+        "teacherStatus": { "type": "string", "enum": ["none", "pending", "approved", "rejected"] },
+        "photoURL": { "type": "string", "maxLength": 512 },
+        "dailyGoalMinutes": { "type": "number" },
+        "streakDays": { "type": "number" },
+        "lastPracticeDate": { "type": "string", "maxLength": 32 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Course": {
+      "title": "Speaking Course",
+      "description": "A curated speaking course with units and lessons",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "level": { "type": "string", "enum": ["Beginner", "Intermediate", "Advanced"] },
+        "teacherId": { "type": "string", "maxLength": 128 },
+        "teacherName": { "type": "string", "maxLength": 100 },
+        "published": { "type": "boolean" },
+        "lessonCount": { "type": "number" },
+        "enrolledStudentIds": { "type": "array" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["title", "teacherId", "level"]
+    },
+    "Activity": {
+      "title": "Speaking Activity",
+      "description": "A speaking challenge, prompt, or roleplay exercise",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 140 },
+        "type": { "type": "string", "enum": ["discussion", "picture_description", "storytelling", "role_play", "interview", "presentation", "timed_challenge"] },
+        "promptText": { "type": "string", "maxLength": 2000 },
+        "imageUrl": { "type": "string", "maxLength": 512 },
+        "prepTimeSeconds": { "type": "number" },
+        "minDurationSeconds": { "type": "number" },
+        "maxDurationSeconds": { "type": "number" },
+        "difficulty": { "type": "string", "enum": ["beginner", "intermediate", "advanced"] },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "isSystemPrompt": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["title", "type", "promptText", "difficulty", "createdBy"]
+    },
+    "Assignment": {
+      "title": "Speaking Assignment",
+      "description": "A teacher-assigned speaking task with deadlines and rubrics",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 140 },
+        "courseId": { "type": "string", "maxLength": 128 },
+        "teacherId": { "type": "string", "maxLength": 128 },
+        "prompt": { "type": "string", "maxLength": 2000 },
+        "dueDate": { "type": "string", "maxLength": 64 },
+        "targetClass": { "type": "string", "maxLength": 64 },
+        "assignedStudentIds": { "type": "array" },
+        "maxDurationSeconds": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["title", "teacherId", "prompt", "dueDate"]
+    },
+    "Submission": {
+      "title": "Speaking Submission",
+      "description": "Student recorded audio response for an assignment with evaluation",
+      "type": "object",
+      "properties": {
+        "assignmentId": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 100 },
+        "teacherId": { "type": "string", "maxLength": 128 },
+        "audioUrl": { "type": "string", "maxLength": 2048 },
+        "durationSeconds": { "type": "number" },
+        "status": { "type": "string", "enum": ["submitted", "processing", "graded", "needs_revision"] },
+        "transcript": { "type": "string", "maxLength": 5000 },
+        "teacherFeedback": { "type": "string", "maxLength": 3000 },
+        "teacherGrade": { "type": "number" },
+        "submittedAt": { "type": "string", "maxLength": 64 },
+        "gradedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["studentId", "teacherId", "status"]
+    },
+    "PracticeSession": {
+      "title": "Practice Session",
+      "description": "A student independent speaking practice session",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string", "maxLength": 128 },
+        "activityId": { "type": "string", "maxLength": 128 },
+        "activityTitle": { "type": "string", "maxLength": 140 },
+        "activityType": { "type": "string", "maxLength": 64 },
+        "durationSeconds": { "type": "number" },
+        "transcript": { "type": "string", "maxLength": 5000 },
+        "completedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["studentId", "activityTitle", "durationSeconds"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "User profiles partitioned by user ID"
+    },
+    "/courses/{courseId}": {
+      "schema": { "$ref": "Course" },
+      "description": "Speaking courses managed by teachers and enrolled by students"
+    },
+    "/activities/{activityId}": {
+      "schema": { "$ref": "Activity" },
+      "description": "Speaking activities, topics, prompts, and scenarios"
+    },
+    "/assignments/{assignmentId}": {
+      "schema": { "$ref": "Assignment" },
+      "description": "Teacher assignments given to students"
+    },
+    "/submissions/{submissionId}": {
+      "schema": { "$ref": "Submission" },
+      "description": "Student audio submissions for assignments"
+    },
+    "/practice_sessions/{sessionId}": {
+      "schema": { "$ref": "PracticeSession" },
+      "description": "Student independent speaking practice records"
+    }
+  }
+}

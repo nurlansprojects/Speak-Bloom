@@ -1,0 +1,6 @@
+{
+  "name": "Speak Bloom",
+  "description": "An elegant English-speaking learning platform connecting teachers and students with speech practice, audio submissions, rubrics, and AI speaking coaching.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
